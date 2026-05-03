@@ -496,19 +496,21 @@ async function startGen() {
     const data = await res.json();
     clearInterval(stepInt);
     steps.forEach(s => { document.getElementById(s).classList.remove('active'); document.getElementById(s).classList.add('done'); });
+    if (data.error) throw new Error('API: ' + (data.error.message || data.error));
+    if (!data.content) throw new Error('Sin respuesta: ' + JSON.stringify(data));
     const tc = data.content.find(c => c.type === 'text');
     const jm = (tc ? tc.text : '').match(/\{[\s\S]*\}/);
-    if (!jm) throw new Error();
+    if (!jm) throw new Error('JSON no encontrado en: ' + (tc ? tc.text.slice(0,200) : 'vacio'));
     const parsed = JSON.parse(jm[0]);
     questions = parsed.questions;
-    if (!questions?.length) throw new Error();
+    if (!questions?.length) throw new Error('Sin preguntas en JSON');
     currentQ = 0; score = 0; answered = false; results = []; timeoutCount = 0; streak = 0; maxStreak = 0; wrongOnly = false;
     sessionStart = Date.now();
     renderQ();
     showView('quiz-view');
   } catch (e) {
     clearInterval(stepInt);
-    alert('Error al generar las preguntas. Inténtalo de nuevo.');
+    alert('Error: ' + (e.message || 'desconocido'));
     showView('upload-view');
   }
 }
