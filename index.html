@@ -489,9 +489,9 @@ async function startGen() {
   const chunk = pdfText.slice(0, 8000);
   const prompt = `Eres un profesor experto. Analiza este contenido y genera EXACTAMENTE ${numQ} preguntas de opción múltiple con dificultad ${diff}.\n\nCONTENIDO:\n${chunk}\n\nResponde SOLO con JSON válido, sin texto extra:\n{"questions":[{"question":"texto","options":["A","B","C","D"],"correct":0,"explanation":"explicación breve"}]}\n\n"correct" es el índice 0-3. Preguntas relevantes y desafiantes.`;
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await fetch('/api/generate', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 4000, messages: [{ role: 'user', content: prompt }] })
+      body: JSON.stringify({ prompt })
     });
     const data = await res.json();
     clearInterval(stepInt);
