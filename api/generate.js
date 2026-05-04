@@ -32,12 +32,11 @@ export default async function handler(req, res) {
     const numMatch = prompt ? prompt.match(/EXACTAMENTE (\d+) preguntas/) : null;
     const numQ = numMatch ? parseInt(numMatch[1]) : 10;
 
-    // 🔥 GENERAR MÁS Y FILTRAR
     const rawQuestions = generateQuestions(text, numQ * 3);
 
     const questions = rawQuestions
       .map(q => ({ ...q, score: scoreQuestion(q) }))
-      .filter(q => isValidQuestion(q))
+      .filter(isValidQuestion)
       .sort((a, b) => b.score - a.score)
       .slice(0, numQ);
 
@@ -55,11 +54,12 @@ export default async function handler(req, res) {
 }
 
 // ─────────────────────────────
-// LIMPIEZA FUERTE
+// LIMPIEZA FUERTE DEL TEXTO
 // ─────────────────────────────
 function cleanTextHard(text) {
   return text
-    .replace(/\b(página|figura|tabla|capítulo)\b/gi, '')
+    .replace(/([a-záéíóúñ])([A-ZÁÉÍÓÚÑ])/g, '$1 $2') // separa palabras pegadas
+    .replace(/\b(página|figura|tabla|capítulo|unidad|tema)\b/gi, '')
     .replace(/\d+\s*\/\s*\d+/g, '')
     .replace(/[^\w\sáéíóúñÁÉÍÓÚ.,;:()%-]/g, ' ')
     .replace(/\s+/g, ' ')
@@ -67,7 +67,7 @@ function cleanTextHard(text) {
 }
 
 // ─────────────────────────────
-// EXTRACTION FALLBACK
+// FALLBACK PDF
 // ─────────────────────────────
 function extractManual(buf) {
   let t = '';
@@ -91,12 +91,10 @@ function extractManual(buf) {
 }
 
 // ─────────────────────────────
-// GENERACIÓN PRINCIPAL
+// GENERACIÓN DE PREGUNTAS
 // ─────────────────────────────
 function generateQuestions(text, numQ) {
-
   const paragraphs = text.split(/\n{2,}/).filter(p => p.length > 150);
-
   const questions = [];
 
   for (const p of paragraphs) {
@@ -107,16 +105,22 @@ function generateQuestions(text, numQ) {
     for (const s of sentences) {
       if (questions.length >= numQ) break;
 
+      if (looksLikeTitle(s)) continue;
+
       const correct = s.slice(0, 120);
-      if (isGarbage(correct)) continue;
+      if (!isValidOption(correct)) continue;
 
       const distractors = smartDistractors(correct, sentences);
 
       if (distractors.length < 3) continue;
 
-      const isTrap = Math.random() < 0.25;
+      const options = shuffle([correct, ...distractors])
+        .filter(isValidOption)
+        .slice(0, 4);
 
-      const options = shuffle([correct, ...distractors]).slice(0, 4);
+      if (options.length < 4) continue;
+
+      const isTrap = Math.random() < 0.25;
 
       const correctIndex = isTrap
         ? options.findIndex(o => o !== correct)
@@ -139,24 +143,42 @@ function generateQuestions(text, numQ) {
 }
 
 // ─────────────────────────────
-// UTILIDADES
+// FILTROS INTELIGENTES
 // ─────────────────────────────
-
 function isStrongSentence(s) {
-  return s.length > 60 && s.length < 200;
-}
-
-function isGarbage(text) {
   return (
-    text.length < 15 ||
-    /^[\d\s.,;:]+$/.test(text) ||
-    text.includes('http')
+    s.length > 50 &&
+    s.length < 180 &&
+    s.includes(' ') &&
+    /[a-záéíóúñ]/i.test(s) &&
+    !/[A-Z]{5,}/.test(s) &&
+    !/\d{3,}/.test(s) &&
+    s.split(' ').length >= 8
   );
 }
 
+function looksLikeTitle(s) {
+  return s.split(' ').length < 6;
+}
+
+function isValidOption(o) {
+  return (
+    o &&
+    o.length > 20 &&
+    o.length < 150 &&
+    o.includes(' ') &&
+    !/[A-Z]{6,}/.test(o) &&
+    !/\d{3,}/.test(o) &&
+    !o.includes('http')
+  );
+}
+
+// ─────────────────────────────
+// DISTRACCIONES INTELIGENTES
+// ─────────────────────────────
 function smartDistractors(correct, pool) {
   return pool
-    .filter(p => p !== correct)
+    .filter(p => p !== correct && isValidOption(p))
     .map(p => ({
       text: p,
       score: Math.abs(p.length - correct.length)
@@ -166,11 +188,17 @@ function smartDistractors(correct, pool) {
     .map(x => x.text);
 }
 
+// ─────────────────────────────
+// NORMALIZAR OPCIONES
+// ─────────────────────────────
 function normalizeOptions(options) {
   const avg = options.reduce((a, b) => a + b.length, 0) / options.length;
   return options.map(o => o.length > avg * 1.5 ? o.slice(0, avg) : o);
 }
 
+// ─────────────────────────────
+// VALIDACIÓN Y SCORE
+// ─────────────────────────────
 function isValidQuestion(q) {
   if (!q.question || q.question.length < 10) return false;
   if (!q.options || q.options.length !== 4) return false;
@@ -197,6 +225,9 @@ function scoreQuestion(q) {
   return score;
 }
 
+// ─────────────────────────────
+// UTIL
+// ─────────────────────────────
 function shuffle(arr) {
   return arr.sort(() => Math.random() - 0.5);
 }
