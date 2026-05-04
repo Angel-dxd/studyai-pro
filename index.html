@@ -1,730 +1,214 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>StudyAI Pro</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<style>
-  *{box-sizing:border-box;margin:0;padding:0}
-  :root{
-    --bg:#f8f7f4;--surface:#ffffff;--surface2:#f1efe8;
-    --border:#e0ddd6;--border2:#ccc9c0;
-    --text:#1a1a18;--text2:#6b6960;--text3:#9b9890;
-    --blue:#185FA5;--blue-light:#E6F1FB;--blue-dark:#0C447C;
-    --green:#27500A;--green-light:#EAF3DE;--green-border:#97C459;
-    --red:#501313;--red-light:#FCEBEB;--red-border:#F09595;
-    --amber:#633806;--amber-light:#FAEEDA;--amber-border:#EF9F27;
-    --radius:8px;--radius-lg:12px;
-  }
-  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:15px;line-height:1.5}
-
-  /* ── AUTH ── */
-  #auth-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:2rem}
-  .auth-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:2.5rem;width:100%;max-width:380px}
-  .auth-logo{font-size:11px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--text3);margin-bottom:1.75rem}
-  .auth-title{font-size:22px;font-weight:600;margin-bottom:.375rem}
-  .auth-sub{font-size:14px;color:var(--text2);margin-bottom:2rem}
-  .field{margin-bottom:1rem}
-  .field label{display:block;font-size:13px;font-weight:500;color:var(--text2);margin-bottom:.375rem}
-  .field input{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius);font-size:14px;color:var(--text);background:var(--surface);outline:none;transition:border-color .15s}
-  .field input:focus{border-color:var(--blue)}
-  .auth-btn{width:100%;padding:11px;background:var(--blue);color:#fff;border:none;border-radius:var(--radius);font-size:14px;font-weight:500;cursor:pointer;transition:background .15s;margin-top:.5rem}
-  .auth-btn:hover{background:var(--blue-dark)}
-  .auth-btn:disabled{opacity:.5;cursor:default}
-  .auth-switch{text-align:center;margin-top:1.25rem;font-size:13px;color:var(--text2)}
-  .auth-switch a{color:var(--blue);cursor:pointer;text-decoration:none;font-weight:500}
-  .auth-err{padding:10px 12px;background:var(--red-light);border:1px solid var(--red-border);border-radius:var(--radius);font-size:13px;color:var(--red);margin-bottom:1rem;display:none}
-  .auth-ok{padding:10px 12px;background:var(--green-light);border:1px solid var(--green-border);border-radius:var(--radius);font-size:13px;color:var(--green);margin-bottom:1rem;display:none}
-
-  /* ── APP ── */
-  #app{display:none}
-  .topbar{display:flex;align-items:center;justify-content:space-between;padding:.875rem 1.5rem;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:10}
-  .topbar-logo{font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text)}
-  .topbar-right{display:flex;align-items:center;gap:10px}
-  .user-email{font-size:12px;color:var(--text2)}
-  .logout-btn{padding:6px 12px;border:1px solid var(--border);border-radius:var(--radius);font-size:12px;color:var(--text2);background:transparent;cursor:pointer;transition:all .15s}
-  .logout-btn:hover{background:var(--surface2);color:var(--text)}
-
-  .container{max-width:680px;margin:0 auto;padding:2rem 1.5rem}
-
-  /* ── UPLOAD ── */
-  #upload-view{}
-  .page-title{font-size:22px;font-weight:600;margin-bottom:.375rem}
-  .page-sub{font-size:14px;color:var(--text2);margin-bottom:2rem}
-  .drop-zone{border:1.5px dashed var(--border2);border-radius:var(--radius-lg);padding:2.5rem 2rem;text-align:center;background:var(--surface);cursor:pointer;transition:all .2s;margin-bottom:1.25rem}
-  .drop-zone:hover,.drop-zone.drag{border-color:var(--blue);background:var(--blue-light)}
-  .drop-icon{width:40px;height:40px;margin:0 auto 12px;background:var(--blue-light);border-radius:10px;display:flex;align-items:center;justify-content:center}
-  .drop-icon svg{width:20px;height:20px;stroke:var(--blue);fill:none;stroke-width:1.5}
-  .drop-label{font-size:14px;color:var(--text2)}.drop-label strong{color:var(--text)}
-  .drop-hint{font-size:12px;color:var(--text3);margin-top:4px}
-  .file-status{width:100%;padding:10px 14px;border-radius:var(--radius);font-size:13px;margin-bottom:1.25rem;display:none}
-  .file-ok-s{background:var(--green-light);border:1px solid var(--green-border);color:var(--green)}
-  .file-err-s{background:var(--red-light);border:1px solid var(--red-border);color:var(--red)}
-  .opts-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:1.25rem}
-  .opt-group label{display:block;font-size:12px;color:var(--text2);margin-bottom:5px;font-weight:500}
-  select{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);color:var(--text);font-size:13px;outline:none;cursor:pointer}
-  select:focus{border-color:var(--blue)}
-  .main-btn{width:100%;padding:12px;background:var(--blue);color:#fff;border:none;border-radius:var(--radius);font-size:14px;font-weight:500;cursor:pointer;transition:background .15s;opacity:.4;pointer-events:none}
-  .main-btn.on{opacity:1;pointer-events:all}.main-btn.on:hover{background:var(--blue-dark)}
-
-  .hist-section{margin-top:2.5rem}
-  .section-label{font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--text3);margin-bottom:10px}
-  .hist-item{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:11px 14px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between}
-  .hist-name{font-size:13px;font-weight:500}
-  .hist-meta{font-size:12px;color:var(--text2);margin-top:2px}
-  .hist-pct{font-size:14px;font-weight:600}
-  .pct-green{color:#3B6D11}.pct-amber{color:#854F0B}.pct-red{color:#A32D2D}
-
-  /* ── LOADING ── */
-  #loading-view{display:none;text-align:center;padding:4rem 2rem}
-  .spinner{width:36px;height:36px;border:2.5px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 1.5rem}
-  @keyframes spin{to{transform:rotate(360deg)}}
-  .load-text{font-size:14px;color:var(--text2);margin-bottom:1.5rem}
-  .steps{display:inline-flex;flex-direction:column;gap:8px;text-align:left}
-  .step{font-size:13px;color:var(--text3);display:flex;align-items:center;gap:8px;transition:color .3s}
-  .step.active{color:var(--text)}.step.done{color:#3B6D11}
-  .step-dot{width:6px;height:6px;border-radius:50%;background:var(--border);flex-shrink:0}
-  .step.active .step-dot{background:var(--blue)}.step.done .step-dot{background:#639922}
-
-  /* ── QUIZ ── */
-  #quiz-view{display:none}
-  .quiz-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;padding-bottom:1rem;border-bottom:1px solid var(--border)}
-  .qh-left .qh-name{font-size:14px;font-weight:500}
-  .qh-left .qh-prog{font-size:12px;color:var(--text2);margin-top:2px}
-  .timer-box{text-align:right}
-  .timer-val{font-size:22px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--text)}
-  .timer-val.warn{color:#854F0B}.timer-val.danger{color:#A32D2D}
-  .timer-lbl{font-size:11px;color:var(--text3)}
-  .prog-bar{height:3px;background:var(--border);border-radius:2px;margin-bottom:1.5rem;overflow:hidden}
-  .prog-fill{height:100%;background:var(--blue);border-radius:2px;transition:width .3s}
-  .q-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.5rem;margin-bottom:1rem}
-  .q-label{font-size:11px;color:var(--text3);margin-bottom:8px;font-weight:500}
-  .q-text{font-size:15px;font-weight:500;line-height:1.55;margin-bottom:1.25rem}
-  .answers{display:flex;flex-direction:column;gap:8px}
-  .ans{width:100%;text-align:left;padding:11px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);font-size:13px;color:var(--text);cursor:pointer;transition:all .15s;line-height:1.4}
-  .ans:hover:not(:disabled){border-color:var(--blue);background:var(--blue-light);color:var(--blue-dark)}
-  .ans.correct{background:var(--green-light);border-color:var(--green-border);color:var(--green)}
-  .ans.wrong{background:var(--red-light);border-color:var(--red-border);color:var(--red)}
-  .ans:disabled{cursor:default}
-  .expl-box{margin-top:1rem;padding:10px 14px;background:var(--surface2);border-left:3px solid var(--blue);font-size:13px;color:var(--text2);line-height:1.6;display:none}
-  .expl-box.show{display:block}
-  .timeout-box{margin-top:1rem;padding:10px 14px;background:var(--amber-light);border:1px solid var(--amber-border);border-radius:var(--radius);font-size:13px;color:var(--amber);display:none}
-  .nav-row{display:flex;justify-content:space-between;margin-top:1rem;gap:10px}
-  .btn{padding:9px 18px;border:1px solid var(--border2);border-radius:var(--radius);font-size:13px;font-weight:500;cursor:pointer;background:var(--surface);color:var(--text);transition:all .15s}
-  .btn:hover{background:var(--surface2)}
-  .btn.primary{background:var(--blue);color:#fff;border-color:transparent}.btn.primary:hover{background:var(--blue-dark)}
-  .btn.danger{background:var(--red-light);color:var(--red);border-color:var(--red-border)}
-
-  /* ── RESULTS ── */
-  #results-view{display:none}
-  .result-hero{display:flex;align-items:center;gap:2rem;margin-bottom:2rem;flex-wrap:wrap}
-  .ring-wrap{position:relative;width:110px;height:110px;flex-shrink:0}
-  .ring-wrap svg{width:110px;height:110px;transform:rotate(-90deg)}
-  .ring-bg{fill:none;stroke:var(--border);stroke-width:9}
-  .ring-fill{fill:none;stroke:var(--blue);stroke-width:9;stroke-linecap:round;stroke-dasharray:283;stroke-dashoffset:283;transition:stroke-dashoffset .9s ease}
-  .ring-center{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center}
-  .ring-pct{font-size:22px;font-weight:600}
-  .ring-lbl{font-size:10px;color:var(--text3)}
-  .result-info .r-title{font-size:20px;font-weight:600;margin-bottom:4px}
-  .result-info .r-sub{font-size:14px;color:var(--text2);margin-bottom:4px}
-  .result-info .r-time{font-size:13px;color:var(--text3)}
-  .stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:1.5rem}
-  .stat-card{padding:12px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);text-align:center}
-  .stat-val{font-size:22px;font-weight:600}
-  .stat-lbl{font-size:11px;color:var(--text2);margin-top:2px}
-  .action-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:2rem}
-  .review-wrap{margin-top:.5rem}
-  .review-header{font-size:13px;font-weight:500;color:var(--text);padding-bottom:8px;border-bottom:1px solid var(--border);margin-bottom:12px}
-  .rev-item{border-radius:var(--radius);padding:14px;margin-bottom:10px;border:1px solid}
-  .rev-item.ok{background:var(--green-light);border-color:var(--green-border)}
-  .rev-item.bad{background:var(--red-light);border-color:var(--red-border)}
-  .rev-badge{display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;margin-bottom:6px}
-  .rev-badge.ok{background:#C0DD97;color:#173404}.rev-badge.bad{background:#F7C1C1;color:#501313}.rev-badge.timeout{background:#FAC775;color:#412402}
-  .rev-q{font-size:13px;font-weight:500;margin-bottom:8px;line-height:1.4}
-  .rev-q.ok{color:var(--green)}.rev-q.bad{color:var(--red)}
-  .rev-opts{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:8px}
-  .rev-opt{font-size:12px;padding:5px 9px;border-radius:5px;background:rgba(255,255,255,0.55);line-height:1.3}
-  .rev-opt.correct{font-weight:600;background:rgba(255,255,255,0.85)}
-  .rev-opt.wrong-pick{text-decoration:line-through;opacity:.6}
-  .rev-expl{font-size:12px;padding:6px 10px;border-radius:5px;background:rgba(255,255,255,0.45);line-height:1.5;color:var(--text2)}
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StudyAI Pro</title>
+  <meta name="description" content="Genera tests personalizados con IA a partir de tus PDFs. Estudia de forma inteligente.">
+  <link rel="stylesheet" href="css/styles.css">
 </head>
+
 <body>
 
-<!-- ════════ AUTH ════════ -->
-<div id="auth-screen">
-  <div class="auth-card">
-    <div class="auth-logo">StudyAI Pro</div>
-    <h1 class="auth-title" id="auth-title">Iniciar sesión</h1>
-    <p class="auth-sub" id="auth-sub">Accede a tu academia personal</p>
-    <div class="auth-err" id="auth-err"></div>
-    <div class="auth-ok" id="auth-ok"></div>
-    <div class="field"><label>Email</label><input type="email" id="auth-email" placeholder="tu@email.com"></div>
-    <div class="field"><label>Contraseña</label><input type="password" id="auth-pass" placeholder="••••••••"></div>
-    <div class="field" id="pass2-field" style="display:none"><label>Repetir contraseña</label><input type="password" id="auth-pass2" placeholder="••••••••"></div>
-    <button class="auth-btn" id="auth-btn" onclick="authSubmit()">Entrar</button>
-    <div class="auth-switch" id="auth-switch">
-      ¿No tienes cuenta? <a onclick="toggleMode()">Regístrate</a>
-    </div>
-    <div class="auth-switch" style="margin-top:.5rem">
-      <a onclick="forgotPass()" style="color:var(--text3);font-weight:400">¿Olvidaste la contraseña?</a>
-    </div>
-  </div>
-</div>
-
-<!-- ════════ APP ════════ -->
-<div id="app">
-  <div class="topbar">
-    <div class="topbar-logo">StudyAI Pro</div>
-    <div class="topbar-right">
-      <span class="user-email" id="user-email"></span>
-      <button class="logout-btn" onclick="logout()">Cerrar sesión</button>
-    </div>
-  </div>
-
-  <div class="container">
-    <!-- UPLOAD -->
-    <div id="upload-view">
-      <h2 class="page-title">Genera tu test</h2>
-      <p class="page-sub">Sube un PDF y la IA creará preguntas personalizadas</p>
-
-      <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-in').click()">
-        <div class="drop-icon">
-          <svg viewBox="0 0 24 24"><path d="M12 16V8m0 0-3 3m3-3 3 3M6 20h12a2 2 0 002-2V9.828a2 2 0 00-.586-1.414l-3.828-3.828A2 2 0 0014.172 4H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-        </div>
-        <p class="drop-label"><strong>Haz clic o arrastra</strong> tu PDF aquí</p>
-        <p class="drop-hint">Matemáticas, historia, contabilidad... cualquier temario</p>
+  <!-- ════════ AUTH ════════ -->
+  <div id="auth-screen">
+    <div class="auth-card">
+      <div class="auth-logo">StudyAI Pro</div>
+      <h1 class="auth-title" id="auth-title">Iniciar sesión</h1>
+      <p class="auth-sub" id="auth-sub">Accede a tu academia personal</p>
+      <div class="auth-err" id="auth-err"></div>
+      <div class="auth-ok" id="auth-ok"></div>
+      <div class="field"><label>Email</label><input type="email" id="auth-email" placeholder="tu@email.com"></div>
+      <div class="field"><label>Contraseña</label><input type="password" id="auth-pass" placeholder="••••••••"></div>
+      <div class="field" id="pass2-field" style="display:none"><label>Repetir contraseña</label><input type="password"
+          id="auth-pass2" placeholder="••••••••"></div>
+      <button class="auth-btn" id="auth-btn" onclick="authSubmit()">Entrar</button>
+      <div class="auth-switch" id="auth-switch">
+        ¿No tienes cuenta? <a onclick="toggleMode()">Regístrate</a>
       </div>
-      <input type="file" id="file-in" accept=".pdf" style="display:none">
-      <div class="file-status" id="file-status"></div>
-
-      <div class="opts-grid">
-        <div class="opt-group"><label>Preguntas</label>
-          <select id="num-q"><option value="5">5</option><option value="10" selected>10</option><option value="15">15</option><option value="20">20</option></select>
-        </div>
-        <div class="opt-group"><label>Dificultad</label>
-          <select id="diff"><option value="fácil">Fácil</option><option value="media" selected>Media</option><option value="difícil">Difícil</option></select>
-        </div>
-        <div class="opt-group"><label>Tiempo / pregunta</label>
-          <select id="timer-sel"><option value="0">Sin límite</option><option value="20">20 s</option><option value="30" selected>30 s</option><option value="60">60 s</option><option value="90">90 s</option></select>
-        </div>
-      </div>
-      <button class="main-btn" id="gen-btn" onclick="startGen()">Generar test →</button>
-
-      <div class="hist-section" id="hist-section" style="display:none">
-        <div class="section-label">Historial de sesiones</div>
-        <div id="hist-list"></div>
-      </div>
-    </div>
-
-    <!-- LOADING -->
-    <div id="loading-view">
-      <div class="spinner"></div>
-      <p class="load-text" id="load-msg">Preparando tu test...</p>
-      <div class="steps">
-        <div class="step" id="ls1"><div class="step-dot"></div>Leyendo el PDF</div>
-        <div class="step" id="ls2"><div class="step-dot"></div>Analizando el contenido</div>
-        <div class="step" id="ls3"><div class="step-dot"></div>Generando preguntas con IA</div>
-        <div class="step" id="ls4"><div class="step-dot"></div>Preparando el test</div>
-      </div>
-    </div>
-
-    <!-- QUIZ -->
-    <div id="quiz-view">
-      <div class="quiz-header">
-        <div class="qh-left">
-          <div class="qh-name" id="qh-name"></div>
-          <div class="qh-prog" id="qh-prog"></div>
-        </div>
-        <div class="timer-box" id="timer-box">
-          <div class="timer-val" id="timer-val">0:30</div>
-          <div class="timer-lbl">tiempo restante</div>
-        </div>
-      </div>
-      <div class="prog-bar"><div class="prog-fill" id="prog-fill"></div></div>
-      <div class="q-card">
-        <div class="q-label" id="q-label"></div>
-        <div class="q-text" id="q-text"></div>
-        <div class="answers" id="answers"></div>
-        <div class="timeout-box" id="timeout-box">⏱ Tiempo agotado — la respuesta correcta está marcada en verde</div>
-        <div class="expl-box" id="expl-box"></div>
-      </div>
-      <div class="nav-row">
-        <button class="btn danger" onclick="confirmAbort()">Abandonar</button>
-        <button class="btn primary" id="next-btn" onclick="nextQ()" style="display:none">Siguiente →</button>
-      </div>
-    </div>
-
-    <!-- RESULTS -->
-    <div id="results-view">
-      <div class="result-hero">
-        <div class="ring-wrap">
-          <svg viewBox="0 0 110 110"><circle class="ring-bg" cx="55" cy="55" r="45"/><circle class="ring-fill" id="ring-fill" cx="55" cy="55" r="45"/></svg>
-          <div class="ring-center"><div class="ring-pct" id="r-pct">0%</div><div class="ring-lbl">puntuación</div></div>
-        </div>
-        <div class="result-info">
-          <div class="r-title" id="r-title"></div>
-          <div class="r-sub" id="r-sub"></div>
-          <div class="r-time" id="r-time"></div>
-        </div>
-      </div>
-      <div class="stats-grid">
-        <div class="stat-card"><div class="stat-val" id="r-ok" style="color:#3B6D11">0</div><div class="stat-lbl">Correctas</div></div>
-        <div class="stat-card"><div class="stat-val" id="r-bad" style="color:#A32D2D">0</div><div class="stat-lbl">Incorrectas</div></div>
-        <div class="stat-card"><div class="stat-val" id="r-tout" style="color:#854F0B">0</div><div class="stat-lbl">Sin tiempo</div></div>
-        <div class="stat-card"><div class="stat-val" id="r-streak">0</div><div class="stat-lbl">Racha máx.</div></div>
-      </div>
-      <div class="action-row">
-        <button class="btn" onclick="goUpload()">Nuevo PDF</button>
-        <button class="btn" onclick="restartSame()">Repetir test</button>
-        <button class="btn" id="retry-btn" onclick="startRetry()" style="display:none">Repasar fallos</button>
-        <button class="btn primary" onclick="exportPDF()">Exportar PDF</button>
-      </div>
-      <div class="review-wrap">
-        <div class="review-header">Revisión detallada</div>
-        <div id="review-list"></div>
+      <div class="auth-switch" style="margin-top:.5rem">
+        <a onclick="forgotPass()" style="color:var(--text3);font-weight:400">¿Olvidaste la contraseña?</a>
       </div>
     </div>
   </div>
-</div>
 
-<script>
-// ══════════════════════════════════════════
-// SUPABASE CONFIG — reemplaza con tus claves
-// ══════════════════════════════════════════
-const SUPABASE_URL = 'https://ezrwxczyemrmyphujtcn.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV6cnd4Y3p5ZW1ybXlwaHVqdGNuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc3OTg5MTIsImV4cCI6MjA5MzM3NDkxMn0.EnhSqxGLbWhZamxnFcze9P-sq_p6vly_fQlgAtu3t9I';
+  <!-- ════════ APP ════════ -->
+  <div id="app">
+    <div class="topbar">
+      <div class="topbar-logo">StudyAI Pro</div>
+      <div class="topbar-right">
+        <span class="user-email" id="user-email"></span>
+        <button class="logout-btn" onclick="logout()">Cerrar sesión</button>
+      </div>
+    </div>
 
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    <div class="container">
+      <!-- UPLOAD -->
+      <div id="upload-view">
+        <h2 class="page-title">Genera tu test</h2>
+        <p class="page-sub">Sube un PDF y la IA creará preguntas personalizadas</p>
 
-// ══════════════════════════════════════════
-// AUTH
-// ══════════════════════════════════════════
-var isRegister = false;
+        <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-in').click()">
+          <div class="drop-icon">
+            <svg viewBox="0 0 24 24">
+              <path
+                d="M12 16V8m0 0-3 3m3-3 3 3M6 20h12a2 2 0 002-2V9.828a2 2 0 00-.586-1.414l-3.828-3.828A2 2 0 0014.172 4H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+          </div>
+          <p class="drop-label"><strong>Haz clic o arrastra</strong> tu PDF aquí</p>
+          <p class="drop-hint">Matemáticas, historia, contabilidad... cualquier temario</p>
+        </div>
+        <input type="file" id="file-in" accept=".pdf" style="display:none">
+        <div class="file-status" id="file-status"></div>
 
-async function initAuth() {
-  const { data: { session } } = await sb.auth.getSession();
-  if (session) showApp(session.user);
-  sb.auth.onAuthStateChange((_e, sess) => {
-    if (sess) showApp(sess.user);
-    else showAuthScreen();
-  });
-}
+        <div class="opts-grid">
+          <div class="opt-group"><label>Preguntas</label>
+            <select id="num-q">
+              <option value="5">5</option>
+              <option value="10" selected>10</option>
+              <option value="15">15</option>
+              <option value="20">20</option>
+            </select>
+          </div>
+          <div class="opt-group"><label>Dificultad</label>
+            <select id="diff">
+              <option value="fácil">Fácil</option>
+              <option value="media" selected>Media</option>
+              <option value="difícil">Difícil</option>
+            </select>
+          </div>
+          <div class="opt-group"><label>Tiempo / pregunta</label>
+            <select id="timer-sel">
+              <option value="0">Sin límite</option>
+              <option value="20">20 s</option>
+              <option value="30" selected>30 s</option>
+              <option value="60">60 s</option>
+              <option value="90">90 s</option>
+            </select>
+          </div>
+        </div>
+        <button class="main-btn" id="gen-btn" onclick="startGen()">Generar test →</button>
 
-function showApp(user) {
-  document.getElementById('auth-screen').style.display = 'none';
-  document.getElementById('app').style.display = 'block';
-  document.getElementById('user-email').textContent = user.email;
-  loadHistory();
-}
+        <div class="hist-section" id="hist-section" style="display:none">
+          <div class="section-label">Historial de sesiones</div>
+          <div id="hist-list"></div>
+        </div>
+      </div>
 
-function showAuthScreen() {
-  document.getElementById('auth-screen').style.display = 'flex';
-  document.getElementById('app').style.display = 'none';
-}
+      <!-- LOADING -->
+      <div id="loading-view">
+        <div class="spinner"></div>
+        <p class="load-text" id="load-msg">Preparando tu test...</p>
+        <div class="steps">
+          <div class="step" id="ls1">
+            <div class="step-dot"></div>Leyendo el PDF
+          </div>
+          <div class="step" id="ls2">
+            <div class="step-dot"></div>Analizando el contenido
+          </div>
+          <div class="step" id="ls3">
+            <div class="step-dot"></div>Generando preguntas con IA
+          </div>
+          <div class="step" id="ls4">
+            <div class="step-dot"></div>Preparando el test
+          </div>
+        </div>
+      </div>
 
-function toggleMode() {
-  isRegister = !isRegister;
-  document.getElementById('auth-title').textContent = isRegister ? 'Crear cuenta' : 'Iniciar sesión';
-  document.getElementById('auth-sub').textContent = isRegister ? 'Únete a StudyAI Pro' : 'Accede a tu academia personal';
-  document.getElementById('auth-btn').textContent = isRegister ? 'Registrarme' : 'Entrar';
-  document.getElementById('pass2-field').style.display = isRegister ? 'block' : 'none';
-  document.getElementById('auth-switch').innerHTML = isRegister
-    ? '¿Ya tienes cuenta? <a onclick="toggleMode()">Inicia sesión</a>'
-    : '¿No tienes cuenta? <a onclick="toggleMode()">Regístrate</a>';
-  clearAuthMsg();
-}
+      <!-- QUIZ -->
+      <div id="quiz-view">
+        <div class="quiz-header">
+          <div class="qh-left">
+            <div class="qh-name" id="qh-name"></div>
+            <div class="qh-prog" id="qh-prog"></div>
+          </div>
+          <div class="timer-box" id="timer-box">
+            <div class="timer-val" id="timer-val">0:30</div>
+            <div class="timer-lbl">tiempo restante</div>
+          </div>
+        </div>
+        <div class="prog-bar">
+          <div class="prog-fill" id="prog-fill"></div>
+        </div>
+        <div class="q-card">
+          <div class="q-label" id="q-label"></div>
+          <div class="q-text" id="q-text"></div>
+          <div class="answers" id="answers"></div>
+          <div class="timeout-box" id="timeout-box">⏱ Tiempo agotado — la respuesta correcta está marcada en verde</div>
+          <div class="expl-box" id="expl-box"></div>
+        </div>
+        <div class="nav-row">
+          <button class="btn danger" onclick="confirmAbort()">Abandonar</button>
+          <button class="btn primary" id="next-btn" onclick="nextQ()" style="display:none">Siguiente →</button>
+        </div>
+      </div>
 
-async function authSubmit() {
-  const email = document.getElementById('auth-email').value.trim();
-  const pass = document.getElementById('auth-pass').value;
-  const pass2 = document.getElementById('auth-pass2').value;
-  const btn = document.getElementById('auth-btn');
-  clearAuthMsg();
-  if (!email || !pass) { showErr('Rellena todos los campos.'); return; }
-  if (isRegister && pass !== pass2) { showErr('Las contraseñas no coinciden.'); return; }
-  if (pass.length < 6) { showErr('La contraseña debe tener al menos 6 caracteres.'); return; }
-  btn.disabled = true; btn.textContent = '...';
-  try {
-    if (isRegister) {
-      const { error } = await sb.auth.signUp({ email, password: pass });
-      if (error) throw error;
-      showOk('¡Cuenta creada! Revisa tu email para confirmarla.');
-    } else {
-      const { error } = await sb.auth.signInWithPassword({ email, password: pass });
-      if (error) throw error;
-    }
-  } catch (e) {
-    showErr(translateError(e.message));
-  }
-  btn.disabled = false;
-  btn.textContent = isRegister ? 'Registrarme' : 'Entrar';
-}
+      <!-- RESULTS -->
+      <div id="results-view">
+        <div class="result-hero">
+          <div class="ring-wrap">
+            <svg viewBox="0 0 110 110">
+              <circle class="ring-bg" cx="55" cy="55" r="45" />
+              <circle class="ring-fill" id="ring-fill" cx="55" cy="55" r="45" />
+            </svg>
+            <div class="ring-center">
+              <div class="ring-pct" id="r-pct">0%</div>
+              <div class="ring-lbl">puntuación</div>
+            </div>
+          </div>
+          <div class="result-info">
+            <div class="r-title" id="r-title"></div>
+            <div class="r-sub" id="r-sub"></div>
+            <div class="r-time" id="r-time"></div>
+          </div>
+        </div>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-val" id="r-ok" style="color:#3B6D11">0</div>
+            <div class="stat-lbl">Correctas</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-val" id="r-bad" style="color:#A32D2D">0</div>
+            <div class="stat-lbl">Incorrectas</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-val" id="r-tout" style="color:#854F0B">0</div>
+            <div class="stat-lbl">Sin tiempo</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-val" id="r-streak">0</div>
+            <div class="stat-lbl">Racha máx.</div>
+          </div>
+        </div>
+        <div class="action-row">
+          <button class="btn" onclick="goUpload()">Nuevo PDF</button>
+          <button class="btn" onclick="restartSame()">Repetir test</button>
+          <button class="btn" id="retry-btn" onclick="startRetry()" style="display:none">Repasar fallos</button>
+          <button class="btn primary" onclick="exportPDF()">Exportar PDF</button>
+        </div>
+        <div class="review-wrap">
+          <div class="review-header">Revisión detallada</div>
+          <div id="review-list"></div>
+        </div>
+      </div>
+    </div>
+  </div>
 
-async function forgotPass() {
-  const email = document.getElementById('auth-email').value.trim();
-  if (!email) { showErr('Escribe tu email primero.'); return; }
-  const { error } = await sb.auth.resetPasswordForEmail(email);
-  if (error) showErr(translateError(error.message));
-  else showOk('Te hemos enviado un enlace para restablecer tu contraseña.');
-}
+  <!-- ════════ DEPENDENCIES ════════ -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
-async function logout() {
-  await sb.auth.signOut();
-  goUpload();
-}
+  <!-- ════════ APP MODULES ════════ -->
+  <script src="js/config.js"></script>
+  <script src="js/state.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/history.js"></script>
+  <script src="js/pdf.js"></script>
+  <script src="js/quiz.js"></script>
+  <script src="js/results.js"></script>
+  <script src="js/app.js"></script>
 
-function translateError(msg) {
-  if (msg.includes('Invalid login')) return 'Email o contraseña incorrectos.';
-  if (msg.includes('already registered')) return 'Este email ya está registrado.';
-  if (msg.includes('Email not confirmed')) return 'Confirma tu email antes de entrar.';
-  return msg;
-}
-
-function showErr(m) { const e = document.getElementById('auth-err'); e.textContent = m; e.style.display = 'block'; }
-function showOk(m) { const o = document.getElementById('auth-ok'); o.textContent = m; o.style.display = 'block'; }
-function clearAuthMsg() { document.getElementById('auth-err').style.display = 'none'; document.getElementById('auth-ok').style.display = 'none'; }
-
-// ══════════════════════════════════════════
-// HISTORIA (Supabase DB)
-// ══════════════════════════════════════════
-async function loadHistory() {
-  const { data: { user } } = await sb.auth.getUser();
-  if (!user) return;
-  const { data } = await sb.from('quiz_history').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(8);
-  renderHistory(data || []);
-}
-
-async function saveHistoryDB(entry) {
-  const { data: { user } } = await sb.auth.getUser();
-  if (!user) return;
-  await sb.from('quiz_history').insert({ user_id: user.id, ...entry });
-}
-
-function renderHistory(rows) {
-  const hs = document.getElementById('hist-section');
-  const hl = document.getElementById('hist-list');
-  if (!rows.length) { hs.style.display = 'none'; return; }
-  hs.style.display = 'block';
-  hl.innerHTML = rows.map(h => {
-    const cls = h.pct >= 70 ? 'pct-green' : h.pct >= 50 ? 'pct-amber' : 'pct-red';
-    const d = new Date(h.created_at).toLocaleDateString('es-ES');
-    return `<div class="hist-item">
-      <div><div class="hist-name">${h.filename}</div><div class="hist-meta">${d} · ${h.time_spent} · ${h.correct}/${h.total} preguntas</div></div>
-      <div class="hist-pct ${cls}">${h.pct}%</div>
-    </div>`;
-  }).join('');
-}
-
-// ══════════════════════════════════════════
-// PDF PARSING
-// ══════════════════════════════════════════
-let pdfText = '', filename = '', questions = [], currentQ = 0, score = 0;
-let answered = false, timerSec = 30, timerInterval = null;
-let results = [], wrongQuestions = [], wrongOnly = false;
-let timeoutCount = 0, streak = 0, maxStreak = 0, sessionStart = 0;
-
-const dz = document.getElementById('drop-zone');
-const fi = document.getElementById('file-in');
-dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag'); });
-dz.addEventListener('dragleave', () => dz.classList.remove('drag'));
-dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('drag'); handleFile(e.dataTransfer.files[0]); });
-fi.addEventListener('change', e => handleFile(e.target.files[0]));
-
-let pdfBase64 = '';
-
-async function handleFile(file) {
-  if (!file || file.type !== 'application/pdf') return;
-  filename = file.name.replace('.pdf', '');
-  const st = document.getElementById('file-status');
-  st.className = 'file-status'; st.style.display = 'block'; st.textContent = 'Cargando ' + file.name + '...';
-  try {
-    // Convertir PDF a base64 para enviarlo al servidor
-    const ab = await file.arrayBuffer();
-    const u8 = new Uint8Array(ab);
-    let binary = '';
-    u8.forEach(b => binary += String.fromCharCode(b));
-    pdfBase64 = btoa(binary);
-    pdfText = 'pdf:' + filename; // marcador para indicar que hay PDF
-    st.className = 'file-status file-ok-s';
-    st.textContent = '✓ ' + file.name + ' — ' + Math.round(file.size / 1024) + ' KB cargado';
-    document.getElementById('gen-btn').classList.add('on');
-  } catch (e) { st.className = 'file-status file-err-s'; st.textContent = 'Error al cargar el PDF.'; }
-}
-
-function extractText(u8) {
-  let t = '';
-  try {
-    // Intentar UTF-8 primero (PDFs modernos)
-    const utf8 = new TextDecoder('utf-8', {fatal: false}).decode(u8);
-    // Buscar texto en XML (PDFs de presentación como PowerPoint)
-    const xmlMatches = utf8.match(/<a:t[^>]*>([^<]+)<\/a:t>/g);
-    if (xmlMatches && xmlMatches.length > 5) {
-      xmlMatches.forEach(x => { t += x.replace(/<[^>]+>/g, '') + ' '; });
-    }
-    // Buscar texto plano legible en UTF-8
-    if (t.length < 100) {
-      const lines = utf8.split('\n');
-      lines.forEach(line => {
-        const clean = line.replace(/[^\x20-\x7EáéíóúñÁÉÍÓÚÑüÜ\s]/g, ' ').trim();
-        if (clean.length > 20 && /[a-zA-ZáéíóúñÁÉÍÓÚÑ]{4,}/.test(clean) && !/^[\d\s\.,;:]+$/.test(clean)) {
-          t += clean + ' ';
-        }
-      });
-    }
-    // Fallback: latin1 con extracción clásica
-    if (t.length < 100) {
-      const s = new TextDecoder('latin1').decode(u8);
-      const sr = /stream([\s\S]*?)endstream/g; let m;
-      while ((m = sr.exec(s)) !== null) {
-        const w = m[1].match(/\(([^)]{3,120})\)/g);
-        if (w) w.forEach(x => {
-          const i = x.slice(1,-1).replace(/\\n/g,' ').replace(/\\\d{3}/g,'').replace(/\\[()\\]/g,'');
-          if (/[a-zA-ZáéíóúñÁÉÍÓÚÑ]{4,}/.test(i) && !/[\x00-\x1F]/.test(i)) t += i + ' ';
-        });
-      }
-    }
-  } catch(e) {}
-  // Limpiar caracteres raros
-  t = t.replace(/[^\x20-\x7EáéíóúñÁÉÍÓÚÑüÜ\s\.,;:!?\-()]/g, ' ');
-  t = t.replace(/\b\w{1,2}\b/g, ' ').replace(/\s+/g, ' ').trim();
-  return t;
-}
-
-// ══════════════════════════════════════════
-// QUIZ GENERATION
-// ══════════════════════════════════════════
-function showView(id) {
-  ['upload-view', 'loading-view', 'quiz-view', 'results-view'].forEach(v => {
-    document.getElementById(v).style.display = 'none';
-  });
-  document.getElementById(id).style.display = 'block';
-}
-
-async function startGen() {
-  if (!pdfText) return;
-  showView('loading-view');
-  const steps = ['ls1', 'ls2', 'ls3', 'ls4'];
-  let si = 0;
-  function nextStep() { if (si < steps.length) { document.getElementById(steps[si]).classList.add('active'); if (si > 0) document.getElementById(steps[si - 1]).classList.add('done'); si++; } }
-  nextStep();
-  const stepInt = setInterval(nextStep, 1400);
-  timerSec = parseInt(document.getElementById('timer-sel').value);
-  const numQ = parseInt(document.getElementById('num-q').value);
-  const diff = document.getElementById('diff').value;
-  const chunk = pdfText.slice(0, 8000);
-  const prompt = `Eres un profesor experto. Analiza este contenido y genera EXACTAMENTE ${numQ} preguntas de opción múltiple con dificultad ${diff}.\n\nCONTENIDO:\n${chunk}\n\nResponde SOLO con JSON válido, sin texto extra:\n{"questions":[{"question":"texto","options":["A","B","C","D"],"correct":0,"explanation":"explicación breve"}]}\n\n"correct" es el índice 0-3. Preguntas relevantes y desafiantes.`;
-  try {
-    const res = await fetch('/api/generate', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt, pdfBase64 })
-    });
-    const data = await res.json();
-    clearInterval(stepInt);
-    steps.forEach(s => { document.getElementById(s).classList.remove('active'); document.getElementById(s).classList.add('done'); });
-    if (data.error) throw new Error('API: ' + (data.error.message || data.error));
-    if (!data.content) throw new Error('Sin respuesta: ' + JSON.stringify(data));
-    const tc = data.content.find(c => c.type === 'text');
-    const jm = (tc ? tc.text : '').match(/\{[\s\S]*\}/);
-    if (!jm) throw new Error('JSON no encontrado en: ' + (tc ? tc.text.slice(0,200) : 'vacio'));
-    const parsed = JSON.parse(jm[0]);
-    questions = parsed.questions;
-    if (!questions?.length) throw new Error('Sin preguntas en JSON');
-    currentQ = 0; score = 0; answered = false; results = []; timeoutCount = 0; streak = 0; maxStreak = 0; wrongOnly = false;
-    sessionStart = Date.now();
-    renderQ();
-    showView('quiz-view');
-  } catch (e) {
-    clearInterval(stepInt);
-    alert('Error: ' + (e.message || 'desconocido'));
-    showView('upload-view');
-  }
-}
-
-// ══════════════════════════════════════════
-// QUIZ LOGIC
-// ══════════════════════════════════════════
-function renderQ() {
-  const q = questions[currentQ]; const total = questions.length;
-  answered = false;
-  document.getElementById('qh-name').textContent = filename;
-  document.getElementById('qh-prog').textContent = (currentQ + 1) + ' de ' + total + (wrongOnly ? ' · modo repaso' : '');
-  document.getElementById('q-label').textContent = 'Pregunta ' + (currentQ + 1);
-  document.getElementById('q-text').textContent = q.question;
-  document.getElementById('prog-fill').style.width = (((currentQ + 1) / total) * 100) + '%';
-  const ans = document.getElementById('answers'); ans.innerHTML = '';
-  q.options.forEach((opt, i) => {
-    const b = document.createElement('button'); b.className = 'ans';
-    b.textContent = ['A', 'B', 'C', 'D'][i] + '. ' + opt;
-    b.onclick = () => selectAns(i, q.correct, q.explanation);
-    ans.appendChild(b);
-  });
-  document.getElementById('expl-box').className = 'expl-box';
-  document.getElementById('expl-box').textContent = '';
-  document.getElementById('timeout-box').style.display = 'none';
-  document.getElementById('next-btn').style.display = 'none';
-  document.getElementById('next-btn').textContent = currentQ < questions.length - 1 ? 'Siguiente →' : 'Ver resultados →';
-  if (timerSec > 0) { document.getElementById('timer-box').style.display = 'block'; startTimer(timerSec); }
-  else document.getElementById('timer-box').style.display = 'none';
-}
-
-function startTimer(s) {
-  clearInterval(timerInterval); let left = s;
-  updateTimer(left, s);
-  timerInterval = setInterval(() => { left--; updateTimer(left, s); if (left <= 0) { clearInterval(timerInterval); timeoutQ(); } }, 1000);
-}
-
-function updateTimer(left, total) {
-  const el = document.getElementById('timer-val');
-  el.textContent = Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0');
-  el.className = 'timer-val' + (left <= 5 ? ' danger' : left <= Math.ceil(total * .33) ? ' warn' : '');
-}
-
-function timeoutQ() {
-  if (answered) return;
-  answered = true; timeoutCount++; streak = 0;
-  const q = questions[currentQ];
-  document.querySelectorAll('.ans').forEach((b, i) => { b.disabled = true; if (i === q.correct) b.classList.add('correct'); });
-  document.getElementById('timeout-box').style.display = 'block';
-  document.getElementById('expl-box').textContent = q.explanation;
-  document.getElementById('expl-box').classList.add('show');
-  document.getElementById('next-btn').style.display = 'block';
-  results.push({ q, chosen: -1, correct: false, timeout: true });
-}
-
-function selectAns(chosen, correct, expl) {
-  if (answered) return;
-  answered = true; clearInterval(timerInterval);
-  const isOk = chosen === correct;
-  if (isOk) { score++; streak++; if (streak > maxStreak) maxStreak = streak; } else streak = 0;
-  document.querySelectorAll('.ans').forEach((b, i) => {
-    b.disabled = true;
-    if (i === correct) b.classList.add('correct');
-    else if (i === chosen && !isOk) b.classList.add('wrong');
-  });
-  document.getElementById('expl-box').textContent = expl;
-  document.getElementById('expl-box').classList.add('show');
-  document.getElementById('next-btn').style.display = 'block';
-  results.push({ q: questions[currentQ], chosen, correct: isOk, timeout: false });
-}
-
-function nextQ() { currentQ++; if (currentQ >= questions.length) showResults(); else renderQ(); }
-
-function confirmAbort() { if (confirm('¿Abandonar el test?')) { clearInterval(timerInterval); showView('upload-view'); } }
-
-// ══════════════════════════════════════════
-// RESULTS
-// ══════════════════════════════════════════
-async function showResults() {
-  clearInterval(timerInterval);
-  const total = questions.length;
-  const pct = Math.round(score / total * 100);
-  const secs = Math.round((Date.now() - sessionStart) / 1000);
-  const timeStr = Math.floor(secs / 60) + 'm ' + (secs % 60) + 's';
-  wrongQuestions = results.filter(r => !r.correct).map(r => r.q);
-
-  document.getElementById('r-pct').textContent = pct + '%';
-  document.getElementById('r-ok').textContent = score;
-  document.getElementById('r-bad').textContent = results.filter(r => !r.correct && !r.timeout).length;
-  document.getElementById('r-tout').textContent = timeoutCount;
-  document.getElementById('r-streak').textContent = maxStreak;
-  document.getElementById('r-time').textContent = 'Tiempo total: ' + timeStr;
-
-  const titles = pct >= 90 ? ['¡Excelente!', 'Dominas este contenido.'] : pct >= 70 ? ['¡Buen trabajo!', 'Estás en buen camino.'] : pct >= 50 ? ['Casi lo tienes', 'Repasa y vuelve a intentarlo.'] : ['Necesitas repasar', 'Estudia el material y practica más.'];
-  document.getElementById('r-title').textContent = titles[0];
-  document.getElementById('r-sub').textContent = titles[1];
-
-  const circ = 283;
-  setTimeout(() => { document.getElementById('ring-fill').style.strokeDashoffset = circ - (circ * pct / 100); }, 100);
-
-  document.getElementById('retry-btn').style.display = wrongQuestions.length ? 'inline-block' : 'none';
-
-  const rl = document.getElementById('review-list');
-  rl.innerHTML = results.map((r, i) => {
-    const cls = r.correct ? 'ok' : 'bad';
-    const badge = r.timeout ? '<span class="rev-badge timeout">⏱ Sin tiempo</span>' : r.correct ? '<span class="rev-badge ok">✓ Correcta</span>' : '<span class="rev-badge bad">✗ Incorrecta</span>';
-    const opts = r.q.options.map((o, oi) => {
-      let c = 'rev-opt';
-      if (oi === r.q.correct) c += ' correct';
-      if (oi === r.chosen && !r.correct && !r.timeout) c += ' wrong-pick';
-      return `<div class="${c}">${['A', 'B', 'C', 'D'][oi]}. ${o}</div>`;
-    }).join('');
-    return `<div class="rev-item ${cls}">${badge}<div class="rev-q ${cls}">${i + 1}. ${r.q.question}</div><div class="rev-opts">${opts}</div><div class="rev-expl">${r.q.explanation}</div></div>`;
-  }).join('');
-
-  showView('results-view');
-
-  await saveHistoryDB({ filename, pct, correct: score, total, time_spent: timeStr });
-  loadHistory();
-}
-
-function restartSame() {
-  currentQ = 0; score = 0; answered = false; results = []; timeoutCount = 0; streak = 0; maxStreak = 0; wrongOnly = false;
-  sessionStart = Date.now(); renderQ(); showView('quiz-view');
-}
-
-function startRetry() {
-  if (!wrongQuestions.length) return;
-  questions = [...wrongQuestions]; currentQ = 0; score = 0; answered = false; results = [];
-  timeoutCount = 0; streak = 0; maxStreak = 0; wrongOnly = true;
-  sessionStart = Date.now(); renderQ(); showView('quiz-view');
-}
-
-function goUpload() {
-  clearInterval(timerInterval); pdfText = ''; questions = [];
-  document.getElementById('gen-btn').classList.remove('on');
-  document.getElementById('file-status').style.display = 'none';
-  document.getElementById('file-in').value = '';
-  showView('upload-view');
-}
-
-// ══════════════════════════════════════════
-// EXPORT PDF
-// ══════════════════════════════════════════
-function exportPDF() {
-  try {
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
-    const pw = doc.internal.pageSize.getWidth(); let y = 20;
-    doc.setFontSize(18); doc.setFont(undefined, 'bold');
-    doc.text('Test: ' + filename, 15, y); y += 8;
-    doc.setFontSize(10); doc.setFont(undefined, 'normal'); doc.setTextColor(100);
-    doc.text('StudyAI Pro — ' + new Date().toLocaleDateString('es-ES'), 15, y); y += 5;
-    doc.text('Resultado: ' + score + '/' + questions.length + ' (' + Math.round(score / questions.length * 100) + '%)', 15, y); y += 8;
-    doc.setDrawColor(200); doc.line(15, y, pw - 15, y); y += 8;
-    doc.setTextColor(0);
-    results.forEach((r, i) => {
-      if (y > 265) { doc.addPage(); y = 20; }
-      doc.setFontSize(10); doc.setFont(undefined, 'bold');
-      doc.setTextColor(r.correct ? [39, 80, 10] : r.timeout ? [99, 56, 6] : [160, 45, 45]);
-      const mark = r.timeout ? '[TIEMPO]' : r.correct ? '[✓]' : '[✗]';
-      const qlines = doc.splitTextToSize((i + 1) + '. ' + mark + ' ' + r.q.question, pw - 30);
-      doc.text(qlines, 15, y); y += qlines.length * 5 + 2;
-      doc.setFont(undefined, 'normal');
-      r.q.options.forEach((opt, oi) => {
-        if (y > 270) { doc.addPage(); y = 20; }
-        const prefix = oi === r.q.correct ? '→ ' : oi === r.chosen && !r.correct ? '✗ ' : '  ';
-        if (oi === r.q.correct) doc.setTextColor(39, 80, 10);
-        else if (oi === r.chosen && !r.correct) doc.setTextColor(160, 45, 45);
-        else doc.setTextColor(80);
-        const olines = doc.splitTextToSize('  ' + prefix + ['A', 'B', 'C', 'D'][oi] + '. ' + opt, pw - 35);
-        doc.text(olines, 15, y); y += olines.length * 4.5;
-      });
-      doc.setTextColor(80, 80, 130);
-      const elines = doc.splitTextToSize('  Explicación: ' + r.q.explanation, pw - 35);
-      doc.text(elines, 15, y); y += elines.length * 4.5 + 7;
-      doc.setDrawColor(220); doc.line(15, y - 2, pw - 15, y - 2); y += 4;
-    });
-    doc.save('test-' + filename.replace(/\s/g, '_') + '.pdf');
-  } catch (e) { alert('Error al exportar el PDF.'); }
-}
-
-// ══════════════════════════════════════════
-// INIT
-// ══════════════════════════════════════════
-initAuth();
-</script>
 </body>
+
 </html>
