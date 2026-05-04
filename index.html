@@ -453,16 +453,40 @@ async function handleFile(file) {
 function extractText(u8) {
   let t = '';
   try {
-    const s = new TextDecoder('latin1').decode(u8);
-    const sr = /stream([\s\S]*?)endstream/g; let m;
-    while ((m = sr.exec(s)) !== null) {
-      const w = m[1].match(/\(([^)]{2,80})\)/g);
-      if (w) w.forEach(x => { const i = x.slice(1, -1).replace(/\\n/g, ' ').replace(/\\\d{3}/g, '').replace(/\\[()\\]/g, ''); if (/[a-zA-ZáéíóúñÁÉÍÓÚÑ]{3,}/.test(i)) t += i + ' '; });
+    // Intentar UTF-8 primero (PDFs modernos)
+    const utf8 = new TextDecoder('utf-8', {fatal: false}).decode(u8);
+    // Buscar texto en XML (PDFs de presentación como PowerPoint)
+    const xmlMatches = utf8.match(/<a:t[^>]*>([^<]+)<\/a:t>/g);
+    if (xmlMatches && xmlMatches.length > 5) {
+      xmlMatches.forEach(x => { t += x.replace(/<[^>]+>/g, '') + ' '; });
     }
-    const tj = /\[(.*?)\]\s*TJ/g;
-    while ((m = tj.exec(s)) !== null) { const p = m[1].match(/\(([^)]+)\)/g); if (p) p.forEach(x => { t += x.slice(1, -1) + ' '; }); }
-  } catch (e) {}
-  return t.replace(/\s+/g, ' ').trim();
+    // Buscar texto plano legible en UTF-8
+    if (t.length < 100) {
+      const lines = utf8.split('\n');
+      lines.forEach(line => {
+        const clean = line.replace(/[^\x20-\x7EáéíóúñÁÉÍÓÚÑüÜ\s]/g, ' ').trim();
+        if (clean.length > 20 && /[a-zA-ZáéíóúñÁÉÍÓÚÑ]{4,}/.test(clean) && !/^[\d\s\.,;:]+$/.test(clean)) {
+          t += clean + ' ';
+        }
+      });
+    }
+    // Fallback: latin1 con extracción clásica
+    if (t.length < 100) {
+      const s = new TextDecoder('latin1').decode(u8);
+      const sr = /stream([\s\S]*?)endstream/g; let m;
+      while ((m = sr.exec(s)) !== null) {
+        const w = m[1].match(/\(([^)]{3,120})\)/g);
+        if (w) w.forEach(x => {
+          const i = x.slice(1,-1).replace(/\\n/g,' ').replace(/\\\d{3}/g,'').replace(/\\[()\\]/g,'');
+          if (/[a-zA-ZáéíóúñÁÉÍÓÚÑ]{4,}/.test(i) && !/[\x00-\x1F]/.test(i)) t += i + ' ';
+        });
+      }
+    }
+  } catch(e) {}
+  // Limpiar caracteres raros
+  t = t.replace(/[^\x20-\x7EáéíóúñÁÉÍÓÚÑüÜ\s\.,;:!?\-()]/g, ' ');
+  t = t.replace(/\b\w{1,2}\b/g, ' ').replace(/\s+/g, ' ').trim();
+  return t;
 }
 
 // ══════════════════════════════════════════
