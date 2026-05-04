@@ -433,21 +433,25 @@ dz.addEventListener('dragleave', () => dz.classList.remove('drag'));
 dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('drag'); handleFile(e.dataTransfer.files[0]); });
 fi.addEventListener('change', e => handleFile(e.target.files[0]));
 
+let pdfBase64 = '';
+
 async function handleFile(file) {
   if (!file || file.type !== 'application/pdf') return;
   filename = file.name.replace('.pdf', '');
   const st = document.getElementById('file-status');
-  st.className = 'file-status'; st.style.display = 'block'; st.textContent = 'Leyendo ' + file.name + '...';
+  st.className = 'file-status'; st.style.display = 'block'; st.textContent = 'Cargando ' + file.name + '...';
   try {
+    // Convertir PDF a base64 para enviarlo al servidor
     const ab = await file.arrayBuffer();
-    pdfText = extractText(new Uint8Array(ab));
-    if (!pdfText || pdfText.length < 20) {
-      pdfText = 'Contenido basado en: ' + filename;
-    }
+    const u8 = new Uint8Array(ab);
+    let binary = '';
+    u8.forEach(b => binary += String.fromCharCode(b));
+    pdfBase64 = btoa(binary);
+    pdfText = 'pdf:' + filename; // marcador para indicar que hay PDF
     st.className = 'file-status file-ok-s';
-    st.textContent = '✓ ' + file.name + ' — ' + Math.round(pdfText.length / 1000) + 'K caracteres detectados';
+    st.textContent = '✓ ' + file.name + ' — ' + Math.round(file.size / 1024) + ' KB cargado';
     document.getElementById('gen-btn').classList.add('on');
-  } catch (e) { st.className = 'file-status file-err-s'; st.textContent = 'Error al leer el PDF.'; }
+  } catch (e) { st.className = 'file-status file-err-s'; st.textContent = 'Error al cargar el PDF.'; }
 }
 
 function extractText(u8) {
@@ -515,7 +519,7 @@ async function startGen() {
   try {
     const res = await fetch('/api/generate', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt })
+      body: JSON.stringify({ prompt, pdfBase64 })
     });
     const data = await res.json();
     clearInterval(stepInt);
