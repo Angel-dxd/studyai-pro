@@ -4,6 +4,7 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
@@ -17,26 +18,31 @@ export default async function handler(req, res) {
         const pdfParse = (await import('pdf-parse/lib/pdf-parse.js')).default;
         const data = await pdfParse(buf);
         text = data.text || '';
-      } catch(e) {
+      } catch (e) {
         text = extractManual(buf);
       }
     }
 
-    if (text.length < 50 && prompt) {
-      const m = prompt.match(/CONTENIDO:\n([\s\S]*?)\n\nResponde/);
-      text = m ? m[1] : '';
-    }
+    text = cleanTextHard(text);
 
-    if (text.length < 50) {
-      return res.status(400).json({ error: 'No se pudo leer el PDF.' });
+    if (text.split(' ').length < 200) {
+      return res.status(400).json({ error: 'PDF con poco contenido útil.' });
     }
 
     const numMatch = prompt ? prompt.match(/EXACTAMENTE (\d+) preguntas/) : null;
     const numQ = numMatch ? parseInt(numMatch[1]) : 10;
-    const questions = generateQuestions(text, numQ);
 
-    if (questions.length < 2) {
-      return res.status(400).json({ error: 'Texto insuficiente para generar preguntas.' });
+    // 🔥 GENERAR MÁS Y FILTRAR
+    const rawQuestions = generateQuestions(text, numQ * 3);
+
+    const questions = rawQuestions
+      .map(q => ({ ...q, score: scoreQuestion(q) }))
+      .filter(q => isValidQuestion(q))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, numQ);
+
+    if (questions.length < 3) {
+      return res.status(400).json({ error: 'No se pudo generar contenido suficiente.' });
     }
 
     return res.status(200).json({
@@ -48,6 +54,21 @@ export default async function handler(req, res) {
   }
 }
 
+// ─────────────────────────────
+// LIMPIEZA FUERTE
+// ─────────────────────────────
+function cleanTextHard(text) {
+  return text
+    .replace(/\b(página|figura|tabla|capítulo)\b/gi, '')
+    .replace(/\d+\s*\/\s*\d+/g, '')
+    .replace(/[^\w\sáéíóúñÁÉÍÓÚ.,;:()%-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// ─────────────────────────────
+// EXTRACTION FALLBACK
+// ─────────────────────────────
 function extractManual(buf) {
   let t = '';
   try {
@@ -58,155 +79,124 @@ function extractManual(buf) {
       const chunk = m[1];
       const parens = chunk.match(/\(([^)]{3,150})\)/g);
       if (parens) parens.forEach(p => {
-        const inner = p.slice(1,-1).replace(/\\n/g,' ').replace(/\\\d{3}/g,'').replace(/\\[()\\]/g,'');
-        if (/[a-zA-ZáéíóúñÁÉÍÓÚÑ]{3,}/.test(inner) && !/[\x00-\x08]/.test(inner)) t += inner + ' ';
+        const inner = p.slice(1, -1)
+          .replace(/\\n/g, ' ')
+          .replace(/\\\d{3}/g, '')
+          .replace(/\\[()\\]/g, '');
+        if (/[a-zA-ZáéíóúñÁÉÍÓÚÑ]{3,}/.test(inner)) t += inner + ' ';
       });
     }
-  } catch(e) {}
-  return t.replace(/\s+/g,' ').trim();
+  } catch (e) {}
+  return t.replace(/\s+/g, ' ').trim();
 }
 
+// ─────────────────────────────
+// GENERACIÓN PRINCIPAL
+// ─────────────────────────────
 function generateQuestions(text, numQ) {
-  // Limpiar texto
-  const clean = text.replace(/\s+/g, ' ').trim();
 
-  // Extraer definiciones (patrón: "X es Y" o "X: Y")
-  const definitions = [];
-  const defPatterns = [
-    /([A-ZÁÉÍÓÚÑ][^.]{5,40})(?:\s+es\s+|\s+son\s+|\:\s+)([^.]{20,150})\./g,
-    /([A-ZÁÉÍÓÚÑ][^.]{3,30})(?:\s+se\s+define\s+como\s+)([^.]{20,150})\./g,
-    /([A-ZÁÉÍÓÚÑ][^.]{3,30})(?:\s+consiste\s+en\s+)([^.]{20,150})\./g,
-    /([A-ZÁÉÍÓÚÑ][^.]{3,30})(?:\s+permite\s+)([^.]{20,150})\./g,
-    /([A-ZÁÉÍÓÚÑ][^.]{3,30})(?:\s+requiere\s+)([^.]{20,150})\./g,
-  ];
-
-  defPatterns.forEach(pattern => {
-    let m;
-    const reg = new RegExp(pattern.source, 'g');
-    while ((m = reg.exec(clean)) !== null) {
-      const term = m[1].trim();
-      const def = m[2].trim();
-      if (term.length > 3 && def.length > 15 && term.split(' ').length <= 6) {
-        definitions.push({ term, def, full: m[0] });
-      }
-    }
-  });
-
-  // Extraer frases con números/datos concretos (capital mínimo, porcentajes, etc.)
-  const dataFacts = [];
-  const dataPattern = /([^.]{10,60}(?:\d[\d.,€%]+)[^.]{5,80})\./g;
-  let dm;
-  while ((dm = dataPattern.exec(clean)) !== null) {
-    if (dm[1].length > 20 && /[a-zA-ZáéíóúñÁÉÍÓÚÑ]{4,}/.test(dm[1])) {
-      dataFacts.push(dm[1].trim());
-    }
-  }
-
-  // Frases generales como fallback
-  const sentences = clean
-    .split(/[.!?]+/)
-    .map(s => s.trim())
-    .filter(s => s.length > 50 && s.length < 300 && /[a-zA-ZáéíóúñÁÉÍÓÚÑ]{4,}/.test(s) && s.split(' ').length >= 8);
+  const paragraphs = text.split(/\n{2,}/).filter(p => p.length > 150);
 
   const questions = [];
-  const usedTerms = new Set();
 
-  // 1. Preguntas de definición (las mejores)
-  const shuffledDefs = [...definitions].sort(() => Math.random() - 0.5);
-  for (const def of shuffledDefs) {
-    if (questions.length >= numQ) break;
-    if (usedTerms.has(def.term.toLowerCase())) continue;
-    usedTerms.add(def.term.toLowerCase());
+  for (const p of paragraphs) {
+    const sentences = p.split(/[.!?]+/)
+      .map(s => s.trim())
+      .filter(isStrongSentence);
 
-    const correctAnswer = def.def.slice(0, 100);
-    const wrongAnswers = sentences
-      .filter(s => !s.includes(def.term) && !s.includes(def.def.slice(0,20)))
-      .sort(() => Math.random() - 0.5)
-      .slice(0, 5)
-      .map(s => s.split(/[,;]/)[0].trim().slice(0, 100))
-      .filter(s => s.length > 15 && s !== correctAnswer)
-      .slice(0, 3);
+    for (const s of sentences) {
+      if (questions.length >= numQ) break;
 
-    if (wrongAnswers.length < 3) continue;
+      const correct = s.slice(0, 120);
+      if (isGarbage(correct)) continue;
 
-    const options = [correctAnswer, ...wrongAnswers].sort(() => Math.random() - 0.5);
-    questions.push({
-      question: `¿Qué es o qué define "${def.term}"?`,
-      options,
-      correct: options.indexOf(correctAnswer),
-      explanation: `"${def.term}" ${def.full.includes(' es ') ? 'es' : def.full.includes(' son ') ? 'son' : 'se refiere a'} ${def.def.slice(0,120)}.`
-    });
-  }
+      const distractors = smartDistractors(correct, sentences);
 
-  // 2. Preguntas de datos concretos
-  const shuffledData = [...dataFacts].sort(() => Math.random() - 0.5);
-  for (const fact of shuffledData) {
-    if (questions.length >= numQ) break;
-    if (usedTerms.has(fact.slice(0,30))) continue;
-    usedTerms.add(fact.slice(0,30));
+      if (distractors.length < 3) continue;
 
-    const correctAnswer = fact.slice(0, 100);
-    const wrongAnswers = dataFacts
-      .filter(f => f !== fact)
-      .sort(() => Math.random() - 0.5)
-      .slice(0, 3)
-      .map(f => f.slice(0, 100))
-      .filter(f => f !== correctAnswer && f.length > 15);
+      const isTrap = Math.random() < 0.25;
 
-    // Si no hay suficientes datos numéricos, usar frases generales
-    while (wrongAnswers.length < 3 && sentences.length > 0) {
-      const s = sentences[Math.floor(Math.random() * sentences.length)];
-      const candidate = s.split(/[,;]/)[0].trim().slice(0, 100);
-      if (!wrongAnswers.includes(candidate) && candidate !== correctAnswer && candidate.length > 15) {
-        wrongAnswers.push(candidate);
-      }
+      const options = shuffle([correct, ...distractors]).slice(0, 4);
+
+      const correctIndex = isTrap
+        ? options.findIndex(o => o !== correct)
+        : options.indexOf(correct);
+
+      const question = isTrap
+        ? `¿Cuál de las siguientes afirmaciones es INCORRECTA?`
+        : `¿Cuál de las siguientes afirmaciones es correcta?`;
+
+      questions.push({
+        question,
+        options: normalizeOptions(options),
+        correct: correctIndex,
+        explanation: correct
+      });
     }
-
-    if (wrongAnswers.length < 3) continue;
-
-    const options = [correctAnswer, ...wrongAnswers.slice(0,3)].sort(() => Math.random() - 0.5);
-    questions.push({
-      question: `Según el contenido estudiado, ¿cuál de estas afirmaciones es correcta?`,
-      options,
-      correct: options.indexOf(correctAnswer),
-      explanation: `La información correcta aparece directamente en el documento: "${correctAnswer.slice(0,100)}".`
-    });
   }
 
-  // 3. Completar con preguntas de frases generales
-  const shuffledSentences = [...sentences].sort(() => Math.random() - 0.5);
-  for (const sentence of shuffledSentences) {
-    if (questions.length >= numQ) break;
-    const key = sentence.slice(0, 30);
-    if (usedTerms.has(key)) continue;
-    usedTerms.add(key);
+  return questions;
+}
 
-    const correctAnswer = sentence.split(/[,;]/)[0].trim().slice(0, 100);
-    if (correctAnswer.length < 20) continue;
+// ─────────────────────────────
+// UTILIDADES
+// ─────────────────────────────
 
-    const wrongAnswers = shuffledSentences
-      .filter(s => s !== sentence)
-      .slice(0, 8)
-      .map(s => s.split(/[,;]/)[0].trim().slice(0, 100))
-      .filter(s => s !== correctAnswer && s.length > 15)
-      .slice(0, 3);
+function isStrongSentence(s) {
+  return s.length > 60 && s.length < 200;
+}
 
-    if (wrongAnswers.length < 3) continue;
+function isGarbage(text) {
+  return (
+    text.length < 15 ||
+    /^[\d\s.,;:]+$/.test(text) ||
+    text.includes('http')
+  );
+}
 
-    // Extraer palabra clave para la pregunta
-    const stopwords = new Set(['para','como','este','esta','tiene','pero','cuando','donde','según','también','puede','deben','será','están','cada','todo','toda','una','uno','sus','más','sin','sobre','entre','que','con','por','los','las','del','sin','está','hay']);
-    const importantWords = sentence.split(/\s+/)
-      .filter(w => w.length > 5 && !stopwords.has(w.toLowerCase()) && /[a-zA-ZáéíóúñÁÉÍÓÚÑ]/.test(w));
-    const keyword = importantWords[0] || 'este concepto';
+function smartDistractors(correct, pool) {
+  return pool
+    .filter(p => p !== correct)
+    .map(p => ({
+      text: p,
+      score: Math.abs(p.length - correct.length)
+    }))
+    .sort((a, b) => a.score - b.score)
+    .slice(0, 3)
+    .map(x => x.text);
+}
 
-    const options = [correctAnswer, ...wrongAnswers].sort(() => Math.random() - 0.5);
-    questions.push({
-      question: `¿Qué afirma el documento sobre "${keyword}"?`,
-      options,
-      correct: options.indexOf(correctAnswer),
-      explanation: `Esta información aparece en el contenido del documento estudiado.`
-    });
-  }
+function normalizeOptions(options) {
+  const avg = options.reduce((a, b) => a + b.length, 0) / options.length;
+  return options.map(o => o.length > avg * 1.5 ? o.slice(0, avg) : o);
+}
 
-  return questions.slice(0, numQ);
+function isValidQuestion(q) {
+  if (!q.question || q.question.length < 10) return false;
+  if (!q.options || q.options.length !== 4) return false;
+
+  const unique = new Set(q.options.map(o => o.toLowerCase()));
+  if (unique.size < 4) return false;
+
+  if (q.options.some(o => o.length < 10)) return false;
+
+  return true;
+}
+
+function scoreQuestion(q) {
+  let score = 0;
+
+  if (q.question.length > 30) score += 2;
+
+  const lengths = q.options.map(o => o.length);
+  if (Math.max(...lengths) - Math.min(...lengths) < 50) score += 2;
+
+  const unique = new Set(q.options);
+  if (unique.size === 4) score += 2;
+
+  return score;
+}
+
+function shuffle(arr) {
+  return arr.sort(() => Math.random() - 0.5);
 }
