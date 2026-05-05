@@ -43,7 +43,7 @@ async function startGen() {
     showView('quiz-view');
   } catch (e) {
     clearInterval(stepInt);
-    alert('Error: ' + (e.message || 'desconocido'));
+    showToast('Error: ' + (e.message || 'desconocido'), 'error', 5000);
     showView('upload-view');
   }
 }
@@ -131,5 +131,7 @@ function nextQ() {
 }
 
 function confirmAbort() {
-  if (confirm('¿Abandonar el test?')) { clearInterval(timerInterval); showView('upload-view'); }
+  showConfirm('Abandonar test', '¿Seguro que quieres abandonar? Perderás tu progreso.', function () {
+    clearInterval(timerInterval); showView('upload-view');
+  });
 }

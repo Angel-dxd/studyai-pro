@@ -31,6 +31,33 @@
   --amber-border: #EF9F27;
   --radius: 8px;
   --radius-lg: 12px;
+  --toast-bg: #323232;
+  --toast-color: #fff;
+}
+
+body.dark {
+  --bg: #111113;
+  --surface: #1c1c1f;
+  --surface2: #252528;
+  --border: #2e2e33;
+  --border2: #3a3a42;
+  --text: #e8e8ec;
+  --text2: #9a9aa8;
+  --text3: #6c6c7a;
+  --blue: #4d9ef6;
+  --blue-light: #1a2a3d;
+  --blue-dark: #7bbaff;
+  --green: #7bc444;
+  --green-light: #1a2a12;
+  --green-border: #4a7a22;
+  --red: #f08080;
+  --red-light: #2d1515;
+  --red-border: #7a2a2a;
+  --amber: #efb84a;
+  --amber-light: #2a2010;
+  --amber-border: #7a5a10;
+  --toast-bg: #e8e8ec;
+  --toast-color: #111113;
 }
 
 body {
@@ -894,3 +921,149 @@ select:focus {
   line-height: 1.5;
   color: var(--text2)
 }
+
+body.dark .rev-opt { background: rgba(255,255,255,.06) }
+body.dark .rev-opt.correct { background: rgba(255,255,255,.12) }
+body.dark .rev-expl { background: rgba(255,255,255,.04) }
+
+/* ── DARK MODE TOGGLE ── */
+.theme-toggle {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text2);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  transition: all .2s;
+  flex-shrink: 0
+}
+.theme-toggle:hover {
+  background: var(--surface2);
+  color: var(--text);
+  transform: rotate(20deg)
+}
+
+/* ── TOAST NOTIFICATIONS ── */
+.toast-container {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 8px;
+  pointer-events: none
+}
+.toast {
+  background: var(--toast-bg);
+  color: var(--toast-color);
+  padding: 12px 20px;
+  border-radius: var(--radius);
+  font-size: 13px;
+  font-weight: 500;
+  box-shadow: 0 4px 20px rgba(0,0,0,.18);
+  pointer-events: auto;
+  transform: translateY(20px);
+  opacity: 0;
+  animation: toastIn .3s ease forwards;
+  max-width: 340px;
+  line-height: 1.4
+}
+.toast.out { animation: toastOut .25s ease forwards }
+.toast.error { border-left: 3px solid var(--red-border) }
+.toast.success { border-left: 3px solid var(--green-border) }
+.toast.warning { border-left: 3px solid var(--amber-border) }
+
+@keyframes toastIn {
+  to { transform: translateY(0); opacity: 1 }
+}
+@keyframes toastOut {
+  to { transform: translateY(20px); opacity: 0 }
+}
+
+/* ── CONFIRM MODAL ── */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.45);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 9998;
+  animation: fadeIn .15s ease
+}
+.modal-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 2rem;
+  max-width: 360px; width: 90%;
+  text-align: center;
+  animation: modalPop .2s ease
+}
+.modal-card h3 { font-size: 16px; margin-bottom: 6px }
+.modal-card p { font-size: 13px; color: var(--text2); margin-bottom: 1.25rem }
+.modal-actions { display: flex; gap: 10px; justify-content: center }
+
+@keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
+@keyframes modalPop { from { transform: scale(.95); opacity: 0 } to { transform: scale(1); opacity: 1 } }
+
+/* ── MICRO-ANIMATIONS ── */
+.auth-card, .q-card, .stat-card, .hist-item, .rev-item {
+  animation: slideUp .35s ease
+}
+@keyframes slideUp {
+  from { transform: translateY(12px); opacity: 0 }
+  to { transform: translateY(0); opacity: 1 }
+}
+
+.ans { transition: all .15s, transform .1s }
+.ans:hover:not(:disabled) { transform: translateY(-1px) }
+.ans:active:not(:disabled) { transform: translateY(0) }
+
+.main-btn, .auth-btn { transition: all .2s }
+.main-btn.on:active, .auth-btn:active { transform: scale(.98) }
+
+.drop-zone { transition: all .25s }
+
+/* ── RESPONSIVE ── */
+@media (max-width: 640px) {
+  .container { padding: 1.25rem 1rem }
+
+  .topbar { padding: .75rem 1rem }
+  .topbar-logo { font-size: 12px }
+  .user-email { display: none }
+
+  .page-title { font-size: 19px }
+  .page-sub { font-size: 13px; margin-bottom: 1.5rem }
+
+  .drop-zone { padding: 1.75rem 1.25rem }
+
+  .opts-grid { grid-template-columns: 1fr; gap: 8px }
+
+  .quiz-header { flex-direction: column; align-items: flex-start; gap: 8px }
+  .timer-box { text-align: left }
+  .timer-val { font-size: 18px }
+
+  .q-text { font-size: 14px }
+  .ans { font-size: 12px; padding: 10px 12px }
+
+  .result-hero { flex-direction: column; text-align: center; gap: 1rem }
+  .stats-grid { grid-template-columns: 1fr 1fr }
+
+  .action-row { flex-direction: column }
+  .action-row .btn { width: 100%; text-align: center }
+
+  .rev-opts { grid-template-columns: 1fr }
+
+  .nav-row { flex-direction: column }
+  .nav-row .btn { width: 100%; text-align: center }
+
+  .auth-card { padding: 1.75rem 1.5rem }
+
+  .toast-container { left: 1rem; right: 1rem; bottom: 1rem }
+  .toast { max-width: 100% }
+}
+

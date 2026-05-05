@@ -111,5 +111,5 @@ function exportPDF() {
       doc.setDrawColor(220); doc.line(15, y - 2, pw - 15, y - 2); y += 4;
     });
     doc.save('test-' + filename.replace(/\s/g, '_') + '.pdf');
-  } catch (e) { alert('Error al exportar el PDF.'); }
+  } catch (e) { showToast('Error al exportar el PDF.', 'error'); }
 }
